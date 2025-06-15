@@ -22,15 +22,16 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
-      - name: Publish self-contained single-file executable
+      - name: Publish self-contained single-file executable (Linux/macOS)
+        if: runner.os != 'Windows'
         run: |
-          dotnet publish src/DeveloperTools.Mcp.Server \
-            -c Release \
-            -r ${{ matrix.rid }} \
-            -p:PublishSingleFile=true \
-            -p:PublishTrimmed=true \
-            -p:SelfContained=true
+          dotnet publish src/DeveloperTools.Mcp.Server -c Release -r ${{ matrix.rid }} -p:PublishSingleFile=true -p:PublishTrimmed=true -p:SelfContained=true
+      - name: Publish self-contained single-file executable (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          dotnet publish src/DeveloperTools.Mcp.Server -c Release -r ${{ matrix.rid }} -p:PublishSingleFile=true -p:PublishTrimmed=true -p:SelfContained=true
+        shell: pwsh
       - uses: actions/upload-artifact@v4
         with:
           name: mcp-${{ matrix.rid }}
-          path: src/DeveloperTools.Mcp.Server/bin/Release/${{ matrix.rid }}/publish/
+          path: src/DeveloperTools.Mcp.Server/bin/Release/net9.0/${{ matrix.rid }}/publish/
