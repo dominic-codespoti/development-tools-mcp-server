@@ -1,0 +1,36 @@
+name: build-mcp
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-latest
+            rid: osx-arm64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Publish self-contained single-file executable
+        run: |
+          dotnet publish src/DeveloperTools.Mcp.Server \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            -p:PublishSingleFile=true \
+            -p:PublishTrimmed=true \
+            -p:SelfContained=true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcp-${{ matrix.rid }}
+          path: src/DeveloperTools.Mcp.Server/bin/Release/${{ matrix.rid }}/publish/
