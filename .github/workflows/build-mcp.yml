@@ -65,11 +65,14 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git tag $VERSION
           git push origin $VERSION
+      - name: Flatten artifacts directory
+        run: |
+          find ./artifacts -type f -exec mv {} ./artifacts/ \;
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.read_version.outputs.version }}
           name: Release ${{ steps.read_version.outputs.version }}
-          files: ./artifacts/**
+          files: ./artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
