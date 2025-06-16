@@ -4,29 +4,13 @@ using Microsoft.Extensions.Logging;
 
 public sealed class CSharpCodeAnalyzer : ICodeAnalyzer
 {
-    private static readonly Microsoft.CodeAnalysis.Host.Mef.MefHostServices _mefHost;
     private readonly AdhocWorkspace _ws;
     private readonly ILogger<CSharpCodeAnalyzer> _logger;
-
-    static CSharpCodeAnalyzer()
-    {
-        var roslynAssemblies = new[]
-        {
-            typeof(Microsoft.CodeAnalysis.Workspace).Assembly,
-            typeof(Microsoft.CodeAnalysis.CSharp.CSharpCompilation).Assembly,
-            typeof(Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree).Assembly,
-            typeof(Microsoft.CodeAnalysis.CSharp.CSharpParseOptions).Assembly,
-            typeof(Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions).Assembly,
-            typeof(Microsoft.CodeAnalysis.CSharp.CSharpSyntaxNode).Assembly,
-            typeof(Microsoft.CodeAnalysis.MSBuild.MSBuildWorkspace).Assembly
-        };
-        _mefHost = Microsoft.CodeAnalysis.Host.Mef.MefHostServices.Create(roslynAssemblies);
-    }
 
     public CSharpCodeAnalyzer(ILogger<CSharpCodeAnalyzer> logger)
     {
         _logger = logger;
-        _ws = new AdhocWorkspace(_mefHost);
+        _ws = new AdhocWorkspace();
     }
 
     public async Task<CodeSymbolInfo?> AnalyzeAsync(
