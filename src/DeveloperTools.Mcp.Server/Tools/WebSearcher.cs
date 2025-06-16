@@ -5,7 +5,7 @@ using System.ComponentModel;
 namespace DeveloperTools.Mcp.Server.Tools;
 
 [McpServerToolType]
-public static class WebTools
+public class WebTools
 {
     [McpServerTool(Name = "search-web")]
     [Description("Search the web and return up to 5 URLs most relevant to the query. Should be chained with `Extract Textual Content` to get the text content of the pages.")]

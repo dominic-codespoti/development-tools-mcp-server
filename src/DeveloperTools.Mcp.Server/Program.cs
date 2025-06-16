@@ -1,5 +1,6 @@
 ﻿using DeveloperTools.Mcp.Abstractions.Services;
 using DeveloperTools.Mcp.Server.Services;
+using DeveloperTools.Mcp.Server.Tools;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -19,6 +20,7 @@ builder.Services.AddSingleton<CodeAnalyzerRegistry>();
 builder.Services
     .AddMcpServer()
     .WithStdioServerTransport()
-    .WithToolsFromAssembly();
+    .WithTools<CodeAnalysisTools>()
+    .WithTools<WebTools>();
 
 await builder.Build().RunAsync();

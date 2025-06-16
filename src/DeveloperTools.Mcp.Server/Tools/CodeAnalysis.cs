@@ -4,7 +4,7 @@ using ModelContextProtocol.Server;
 namespace DeveloperTools.Mcp.Server.Tools;
 
 [McpServerToolType]
-public static class CodeAnalysisTools
+public class CodeAnalysisTools
 {
     [McpServerTool(Name = "analyze-code-symbol")]
     [Description("Return structural details (params, generics, overloads, docs) for a given class/function/etc.")]
