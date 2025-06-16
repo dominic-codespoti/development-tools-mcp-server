@@ -26,8 +26,8 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           dotnet publish src/DeveloperTools.Mcp.Server -c Release -r ${{ matrix.rid }} -p:PublishSingleFile=true -p:PublishTrimmed=true -p:SelfContained=true
-          ext=""
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then ext=""; fi
+          ext=".bin"
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then ext=".bin"; fi
           mv src/DeveloperTools.Mcp.Server/bin/Release/net9.0/${{ matrix.rid }}/publish/DeveloperTools.Mcp.Server mcp-${{ matrix.rid }}$ext
         shell: bash
       - name: Publish self-contained single-file executable (Windows)
@@ -41,7 +41,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: mcp-${{ matrix.rid }}
-          path: mcp-${{ matrix.rid }}*
+          path: mcp-${{ matrix.rid }}.*
   release:
     needs: publish
     runs-on: ubuntu-latest
