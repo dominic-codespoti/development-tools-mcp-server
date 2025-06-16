@@ -34,7 +34,9 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           dotnet publish src/DeveloperTools.Mcp.Server -c Release -r ${{ matrix.rid }} -p:PublishSingleFile=true -p:PublishTrimmed=true -p:SelfContained=true
-          Rename-Item src/DeveloperTools.Mcp.Server/bin/Release/net9.0/${{ matrix.rid }}/publish/DeveloperTools.Mcp.Server.exe mcp-${{ matrix.rid }}.exe
+          $src = "src/DeveloperTools.Mcp.Server/bin/Release/net9.0/${{ matrix.rid }}/publish/DeveloperTools.Mcp.Server.exe"
+          $dst = "mcp-${{ matrix.rid }}.exe"
+          Move-Item $src $dst
         shell: pwsh
       - uses: actions/upload-artifact@v4
         with:
