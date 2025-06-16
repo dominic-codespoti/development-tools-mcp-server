@@ -1,8 +1,8 @@
 name: build-mcp
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -26,12 +26,50 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           dotnet publish src/DeveloperTools.Mcp.Server -c Release -r ${{ matrix.rid }} -p:PublishSingleFile=true -p:PublishTrimmed=true -p:SelfContained=true
+          ext=""
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then ext=""; fi
+          mv src/DeveloperTools.Mcp.Server/bin/Release/net9.0/${{ matrix.rid }}/publish/DeveloperTools.Mcp.Server mcp-${{ matrix.rid }}$ext
+        shell: bash
       - name: Publish self-contained single-file executable (Windows)
         if: runner.os == 'Windows'
         run: |
           dotnet publish src/DeveloperTools.Mcp.Server -c Release -r ${{ matrix.rid }} -p:PublishSingleFile=true -p:PublishTrimmed=true -p:SelfContained=true
+          Rename-Item src/DeveloperTools.Mcp.Server/bin/Release/net9.0/${{ matrix.rid }}/publish/DeveloperTools.Mcp.Server.exe mcp-${{ matrix.rid }}.exe
         shell: pwsh
       - uses: actions/upload-artifact@v4
         with:
           name: mcp-${{ matrix.rid }}
-          path: src/DeveloperTools.Mcp.Server/bin/Release/net9.0/${{ matrix.rid }}/publish/
+          path: mcp-${{ matrix.rid }}*
+  release:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+      - name: Generate version
+        id: version
+        run: echo "main-$(date -u +'%Y%m%d-%H%M%S')" > version.txt
+      - name: Read version
+        id: read_version
+        run: |
+          VERSION=$(cat version.txt)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "::set-output name=version::$VERSION"
+      - name: Create tag
+        run: |
+          VERSION=$(cat version.txt)
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git tag $VERSION
+          git push origin $VERSION
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.read_version.outputs.version }}
+          name: Release ${{ steps.read_version.outputs.version }}
+          files: ./artifacts/**
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
