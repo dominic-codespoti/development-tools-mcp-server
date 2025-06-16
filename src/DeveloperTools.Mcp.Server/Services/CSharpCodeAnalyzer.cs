@@ -1,3 +1,4 @@
+using System.Reflection;
 using DeveloperTools.Mcp.Abstractions.Services;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Host.Mef;
@@ -10,15 +11,23 @@ public sealed class CSharpCodeAnalyzer : ICodeAnalyzer
 
     private static MefHostServices CreateIsolatedRoslynHost()
     {
-        var assemblies = new[]
+        var assemblyNames = new[]
         {
-            typeof(AdhocWorkspace).Assembly,
-            typeof(Microsoft.CodeAnalysis.CSharp.CSharpCompilation).Assembly,
-            typeof(Microsoft.CodeAnalysis.CSharp.SyntaxFactory).Assembly,
-            typeof(Microsoft.CodeAnalysis.MSBuild.MSBuildWorkspace).Assembly,
+            "Microsoft.CodeAnalysis",
+            "Microsoft.CodeAnalysis.CSharp",
+            "Microsoft.CodeAnalysis.Workspaces",
+            "Microsoft.CodeAnalysis.CSharp.Workspaces",
+            "Microsoft.CodeAnalysis.Features",
+            "Microsoft.CodeAnalysis.CSharp.Features",
+            "Microsoft.CodeAnalysis.Workspaces.MSBuild",
         };
 
-        return MefHostServices.Create(assemblies.DistinctBy(a => a.FullName));
+        var assemblies = assemblyNames
+            .Select(name => Assembly.Load(name))
+            .DistinctBy(a => a.FullName)
+            .ToArray();
+
+        return MefHostServices.Create(assemblies);
     }
 
     public CSharpCodeAnalyzer(ILogger<CSharpCodeAnalyzer> logger)

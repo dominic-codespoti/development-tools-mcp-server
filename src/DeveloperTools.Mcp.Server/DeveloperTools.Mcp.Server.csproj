@@ -14,23 +14,26 @@
 
   <!-- ── Internal projects ──────────────────────────── -->
   <ItemGroup>
-    <ProjectReference Include="..\DeveloperTools.Mcp.Abstractions\DeveloperTools.Mcp.Abstractions.csproj" />
+    <ProjectReference
+      Include="..\DeveloperTools.Mcp.Abstractions\DeveloperTools.Mcp.Abstractions.csproj" />
   </ItemGroup>
 
   <!-- ── NuGet deps (ONE Roslyn build) ──────────────── -->
   <ItemGroup>
     <!-- Core libs -->
-    <PackageReference Include="AngleSharp"                       Version="1.3.0" />
-    <PackageReference Include="Microsoft.Extensions.Caching.Memory"       Version="9.0.5" />
-    <PackageReference Include="Microsoft.Extensions.Hosting"             Version="9.0.5" />
-    <PackageReference Include="Microsoft.Extensions.Http"                Version="9.0.5" />
+    <PackageReference Include="AngleSharp" Version="1.3.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.5" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.5" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.5" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.5" />
 
     <!-- Roslyn – *one* version everywhere -->
-    <PackageReference Include="Microsoft.CodeAnalysis.Common"            Version="4.14.0" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp"            Version="4.14.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Common" Version="4.14.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.14.0" />
     <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.14.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Features" Version="4.14.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="4.14.0" />
 
     <!-- ModelContextProtocol   ⌄ KEEP runtime ⌄ -->
     <PackageReference Include="ModelContextProtocol" Version="0.2.0-preview.3" />
@@ -38,12 +41,12 @@
 
   <!-- ── Post-build: delete Roslyn duplicates that came from MCP ── -->
   <Target Name="RemoveOldRoslynFromMcp"
-          AfterTargets="ResolvePackageAssets">
+    AfterTargets="ResolvePackageAssets">
 
     <!-- Assets MCP contributes to the output -->
     <ItemGroup>
       <_McpRoslyn Include="@(ResolvedFileToPublish)"
-                  Condition=" '%(PackageId)' == 'ModelContextProtocol'
+        Condition=" '%(PackageId)' == 'ModelContextProtocol'
                                and %(FileName.StartsWith('Microsoft.CodeAnalysis')) " />
 
       <!-- Remove from publish & from refs copied to bin -->
