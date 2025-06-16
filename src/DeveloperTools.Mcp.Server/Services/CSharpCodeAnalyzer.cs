@@ -1,5 +1,6 @@
 using DeveloperTools.Mcp.Abstractions.Services;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.Extensions.Logging;
 
 public sealed class CSharpCodeAnalyzer : ICodeAnalyzer
@@ -10,7 +11,16 @@ public sealed class CSharpCodeAnalyzer : ICodeAnalyzer
     public CSharpCodeAnalyzer(ILogger<CSharpCodeAnalyzer> logger)
     {
         _logger = logger;
-        _ws = new AdhocWorkspace();
+
+        var host = MefHostServices.Create(MefHostServices.DefaultAssemblies
+            .DistinctBy(a => a.FullName)
+            .Where(a => a.FullName != null && !a.FullName.StartsWith("Microsoft.CodeAnalysis", StringComparison.OrdinalIgnoreCase))
+            .Append(typeof(AdhocWorkspace).Assembly)
+            .Append(typeof(Microsoft.CodeAnalysis.CSharp.CSharpCompilation).Assembly)
+            .Append(typeof(Microsoft.CodeAnalysis.CSharp.SyntaxFactory).Assembly)
+            .Append(typeof(Workspace).Assembly));
+
+        _ws = new AdhocWorkspace(host);
     }
 
     public async Task<CodeSymbolInfo?> AnalyzeAsync(
