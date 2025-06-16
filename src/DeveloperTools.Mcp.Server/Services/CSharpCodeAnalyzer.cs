@@ -110,9 +110,12 @@ public sealed class CSharpCodeAnalyzer(ILogger<CSharpCodeAnalyzer> Logger) : ICo
     {
         string? refDir = null;
         var tfm = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription;
+
+        var dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
+        if (string.IsNullOrEmpty(dotnetRoot)) throw new InvalidOperationException("DOTNET_ROOT environment variable is not set. Please set DOTNET_ROOT to your .NET SDK root directory.");
+
         if (tfm.Contains(".NET", StringComparison.OrdinalIgnoreCase))
         {
-            var dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT") ?? "/usr/share/dotnet";
             var packsDir = Path.Combine(dotnetRoot, "packs", "Microsoft.NETCore.App.Ref");
             if (Directory.Exists(packsDir))
             {
@@ -131,7 +134,6 @@ public sealed class CSharpCodeAnalyzer(ILogger<CSharpCodeAnalyzer> Logger) : ICo
                 }
             }
         }
-
         if (refDir == null || !Directory.Exists(refDir)) throw new InvalidOperationException("Could not locate .NET reference assemblies on this system.");
         return refDir;
     }
