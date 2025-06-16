@@ -24,16 +24,14 @@ public class WebTools
         => search.ScrapeAsync(url, ct);
 
     [McpServerTool(Name = "extract-textual-content")]
-    [Description("Given URLs, scrape each and return cleaned text.")]
-    public static async Task<IReadOnlyList<string>> ExtractRelevantContentAsync(
-        List<string> urls,
+    [Description("Given a single URL, scrape it and return cleaned text.")]
+    public static async Task<string> ExtractRelevantContentAsync(
+        [Description("Absolute URL to scrape.")] string url,
         IWebSearchService search,
         CancellationToken ct = default)
     {
-        var tasks = urls.Distinct()
-                        .Where(x => Uri.IsWellFormedUriString(x, UriKind.Absolute))
-                        .Select(u => search.ScrapeAsync(u, ct).ContinueWith(t => t.IsFaulted ? $"[error] {u}" : t.Result, ct));
-
-        return await Task.WhenAll(tasks);
+        if (!Uri.IsWellFormedUriString(url, UriKind.Absolute))
+            throw new ArgumentException("Invalid URL", nameof(url));
+        return await search.ScrapeAsync(url, ct);
     }
 }
