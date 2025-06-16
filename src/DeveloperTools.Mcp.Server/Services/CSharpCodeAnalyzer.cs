@@ -2,16 +2,39 @@ using DeveloperTools.Mcp.Abstractions.Services;
 using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 
-public sealed class CSharpCodeAnalyzer(ILogger<CSharpCodeAnalyzer> Logger) : ICodeAnalyzer
+public sealed class CSharpCodeAnalyzer : ICodeAnalyzer
 {
-    private readonly AdhocWorkspace _ws = new();
+    private static readonly Microsoft.CodeAnalysis.Host.Mef.MefHostServices _mefHost;
+    private readonly AdhocWorkspace _ws;
+    private readonly ILogger<CSharpCodeAnalyzer> _logger;
+
+    static CSharpCodeAnalyzer()
+    {
+        var roslynAssemblies = new[]
+        {
+            typeof(Microsoft.CodeAnalysis.Workspace).Assembly,
+            typeof(Microsoft.CodeAnalysis.CSharp.CSharpCompilation).Assembly,
+            typeof(Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree).Assembly,
+            typeof(Microsoft.CodeAnalysis.CSharp.CSharpParseOptions).Assembly,
+            typeof(Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions).Assembly,
+            typeof(Microsoft.CodeAnalysis.CSharp.CSharpSyntaxNode).Assembly,
+            typeof(Microsoft.CodeAnalysis.MSBuild.MSBuildWorkspace).Assembly
+        };
+        _mefHost = Microsoft.CodeAnalysis.Host.Mef.MefHostServices.Create(roslynAssemblies);
+    }
+
+    public CSharpCodeAnalyzer(ILogger<CSharpCodeAnalyzer> logger)
+    {
+        _logger = logger;
+        _ws = new AdhocWorkspace(_mefHost);
+    }
 
     public async Task<CodeSymbolInfo?> AnalyzeAsync(
         string filePath,
         string symbolName,
         CancellationToken ct = default)
     {
-        Logger.LogInformation("Analyzing symbol '{SymbolName}' in file '{FilePath}'", symbolName, filePath);
+        _logger.LogInformation("Analyzing symbol '{SymbolName}' in file '{FilePath}'", symbolName, filePath);
 
         var code = await File.ReadAllTextAsync(filePath, ct);
 
