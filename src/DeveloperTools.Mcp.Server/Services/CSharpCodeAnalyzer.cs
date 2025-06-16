@@ -12,14 +12,21 @@ public sealed class CSharpCodeAnalyzer : ICodeAnalyzer
     {
         _logger = logger;
 
-        var host = MefHostServices.Create(MefHostServices.DefaultAssemblies
-            .DistinctBy(a => a.FullName)
-            .Where(a => a.FullName != null && !a.FullName.StartsWith("Microsoft.CodeAnalysis", StringComparison.OrdinalIgnoreCase))
-            .Append(typeof(AdhocWorkspace).Assembly)
-            .Append(typeof(Microsoft.CodeAnalysis.CSharp.CSharpCompilation).Assembly)
-            .Append(typeof(Microsoft.CodeAnalysis.CSharp.SyntaxFactory).Assembly)
-            .Append(typeof(Workspace).Assembly));
+        var roslynAssemblies = new[]
+        {
+            typeof(AdhocWorkspace).Assembly,
+            typeof(Microsoft.CodeAnalysis.CSharp.CSharpCompilation).Assembly,
+            typeof(Microsoft.CodeAnalysis.CSharp.SyntaxFactory).Assembly,
+            typeof(Microsoft.CodeAnalysis.MSBuild.MSBuildWorkspace).Assembly
+        };
 
+        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            if (asm.FullName?.Contains("Microsoft.CodeAnalysis") == true)
+                _logger.LogWarning("LOADED: {0}", asm.FullName);
+        }
+
+        var host = MefHostServices.Create(roslynAssemblies.DistinctBy(a => a.FullName));
         _ws = new AdhocWorkspace(host);
     }
 
