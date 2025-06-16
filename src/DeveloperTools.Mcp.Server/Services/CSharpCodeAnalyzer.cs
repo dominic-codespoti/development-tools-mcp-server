@@ -8,25 +8,24 @@ public sealed class CSharpCodeAnalyzer : ICodeAnalyzer
     private readonly AdhocWorkspace _ws;
     private readonly ILogger<CSharpCodeAnalyzer> _logger;
 
-    public CSharpCodeAnalyzer(ILogger<CSharpCodeAnalyzer> logger)
+    private static MefHostServices CreateIsolatedRoslynHost()
     {
-        _logger = logger;
-
-        var roslynAssemblies = new[]
+        var assemblies = new[]
         {
             typeof(AdhocWorkspace).Assembly,
             typeof(Microsoft.CodeAnalysis.CSharp.CSharpCompilation).Assembly,
             typeof(Microsoft.CodeAnalysis.CSharp.SyntaxFactory).Assembly,
-            typeof(Microsoft.CodeAnalysis.MSBuild.MSBuildWorkspace).Assembly
+            typeof(Microsoft.CodeAnalysis.MSBuild.MSBuildWorkspace).Assembly,
         };
 
-        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-        {
-            if (asm.FullName?.Contains("Microsoft.CodeAnalysis") == true)
-                _logger.LogWarning("LOADED: {0}", asm.FullName);
-        }
+        return MefHostServices.Create(assemblies.DistinctBy(a => a.FullName));
+    }
 
-        var host = MefHostServices.Create(roslynAssemblies.DistinctBy(a => a.FullName));
+    public CSharpCodeAnalyzer(ILogger<CSharpCodeAnalyzer> logger)
+    {
+        _logger = logger;
+
+        var host = CreateIsolatedRoslynHost();
         _ws = new AdhocWorkspace(host);
     }
 
