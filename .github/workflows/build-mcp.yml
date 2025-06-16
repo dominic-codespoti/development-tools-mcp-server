@@ -69,7 +69,7 @@ jobs:
           git push origin $VERSION
       - name: Flatten artifacts directory
         run: |
-          find ./artifacts -mindepth 2 -type f -exec mv -t ./artifacts/ {} +
+          find ./artifacts -type f -exec cp {} ./artifacts/ \;
           find ./artifacts -mindepth 1 -type d -empty -delete
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
