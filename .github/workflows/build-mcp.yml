@@ -7,16 +7,7 @@ on:
 
 jobs:
   publish:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            rid: linux-x64
-          - os: windows-latest
-            rid: win-x64
-          - os: macos-latest
-            rid: osx-arm64
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
