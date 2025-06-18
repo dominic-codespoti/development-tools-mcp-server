@@ -22,26 +22,14 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
-      - name: Publish self-contained single-file executable (Linux/macOS)
-        if: runner.os != 'Windows'
+      - name: Pack as .NET tool
         run: |
-          dotnet publish src/DeveloperTools.Mcp.Server -c Release -r ${{ matrix.rid }} -p:PublishSingleFile=true -p:PublishTrimmed=true -p:SelfContained=true
-          ext=".bin"
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then ext=".bin"; fi
-          mv src/DeveloperTools.Mcp.Server/bin/Release/net9.0/${{ matrix.rid }}/publish/DeveloperTools.Mcp.Server mcp-${{ matrix.rid }}$ext
+          dotnet pack src/DeveloperTools.Mcp.Server -c Release --output ./nupkg
         shell: bash
-      - name: Publish self-contained single-file executable (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          dotnet publish src/DeveloperTools.Mcp.Server -c Release -r ${{ matrix.rid }} -p:PublishSingleFile=true -p:PublishTrimmed=true -p:SelfContained=true
-          $src = "src/DeveloperTools.Mcp.Server/bin/Release/net9.0/${{ matrix.rid }}/publish/DeveloperTools.Mcp.Server.exe"
-          $dst = "mcp-${{ matrix.rid }}.exe"
-          Move-Item $src $dst
-        shell: pwsh
       - uses: actions/upload-artifact@v4
         with:
-          name: mcp-${{ matrix.rid }}
-          path: mcp-${{ matrix.rid }}.*
+          name: developer-tools-mcp-server-nuget
+          path: ./nupkg/*.nupkg
   release:
     needs: publish
     runs-on: ubuntu-latest
@@ -67,15 +55,25 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git tag $VERSION
           git push origin $VERSION
-      - name: Flatten artifacts directory
-        run: |
-          find ./artifacts -type f -exec cp {} ./artifacts/ \;
-          find ./artifacts -mindepth 1 -type d -empty -delete
-      - name: Create GitHub Release
+      - name: Publish .NET tool package to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.read_version.outputs.version }}
           name: Release ${{ steps.read_version.outputs.version }}
-          files: ./artifacts/*
+          files: ./artifacts/developer-tools-mcp-server-nuget/*.nupkg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  publish-nuget:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download .NET tool package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: developer-tools-mcp-server-nuget
+          path: ./nupkg
+      - name: Push .NET tool package to NuGet.org
+        run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}

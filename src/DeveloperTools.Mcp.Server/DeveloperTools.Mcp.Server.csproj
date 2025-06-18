@@ -10,6 +10,8 @@
     <!-- copy every compile-time assembly to bin/ so
          our post-build target can prune duplicates     -->
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>developer-tools-mcp-server</ToolCommandName>
   </PropertyGroup>
 
   <!-- ── Internal projects ──────────────────────────── -->
