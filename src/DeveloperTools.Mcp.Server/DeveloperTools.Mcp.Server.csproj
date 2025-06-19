@@ -12,6 +12,7 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>developer-tools-mcp-server</ToolCommandName>
+    <PackageId>developer-tools-mcp-server</PackageId>
   </PropertyGroup>
 
   <!-- ── Internal projects ──────────────────────────── -->
