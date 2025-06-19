@@ -1,201 +1,186 @@
 using System.Reflection;
+using System.Xml.Linq;
 using DeveloperTools.Mcp.Abstractions.Services;
-using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Host.Mef;
 using Microsoft.Extensions.Logging;
 
-public sealed class CSharpCodeAnalyzer : ICodeAnalyzer
+namespace DeveloperTools.Mcp.Server.Services;
+
+public sealed class CSharpCodeAnalyzer(ILogger<CSharpCodeAnalyzer> Logger) : ICodeAnalyzer
 {
-    private readonly AdhocWorkspace _ws;
-    private readonly ILogger<CSharpCodeAnalyzer> _logger;
-
-    private static MefHostServices CreateIsolatedRoslynHost()
+    public Task<CodeSymbolInfo?> AnalyzeAsync(string sourceFilePath, string symbolName, CancellationToken ct = default)
     {
-        var assemblyNames = new[]
+        Logger.LogInformation("Analyzing C#  file '{SourceFilePath}' for symbol '{SymbolName}'", sourceFilePath, symbolName);
+
+        var csproj = FindCsproj(Path.GetDirectoryName(sourceFilePath)!) ?? throw new InvalidOperationException("No .csproj found for given file.");
+        var binPath = FindBuildOutput(csproj) ?? throw new InvalidOperationException("No bin output folder found. Make sure the project is built.");
+        var dlls = Directory.GetFiles(binPath, "*.dll");
+        var version  = GetTargetFramework(csproj) ?? throw new InvalidOperationException("No target framework found in .csproj.");
+
+        Logger.LogInformation("Found  {DllCount} DLLs in '{BinPath}' for target framework '{Version}'", dlls.Length, binPath, version);
+
+        var refPack = FindRefPackFolder(version);
+        var refDlls = Directory.GetFiles(refPack, "*.dll");
+        var binDlls = Directory.GetFiles(binPath, "*.dll");
+        var allDlls = binDlls.Concat(refDlls).Append(typeof(object).Assembly.Location);
+        var resolver = new PathAssemblyResolver(allDlls);
+        using var mlc = new MetadataLoadContext(resolver, "System.Private.CoreLib");
+
+        foreach (var asmPath in dlls)
         {
-            "Microsoft.CodeAnalysis",
-            "Microsoft.CodeAnalysis.CSharp",
-            "Microsoft.CodeAnalysis.Workspaces",
-            "Microsoft.CodeAnalysis.CSharp.Workspaces",
-            "Microsoft.CodeAnalysis.Features",
-            "Microsoft.CodeAnalysis.CSharp.Features",
-            "Microsoft.CodeAnalysis.Workspaces.MSBuild",
-        };
+            var asm = mlc.LoadFromAssemblyPath(asmPath);
+            var hit = Find(asm, symbolName);
+            if (hit != null) return Task.FromResult<CodeSymbolInfo?>(hit);
+        }
 
-        var assemblies = assemblyNames
-            .Select(name => Assembly.Load(name))
-            .DistinctBy(a => a.FullName)
-            .ToArray();
-
-        return MefHostServices.Create(assemblies);
+        return Task.FromResult<CodeSymbolInfo?>(null);
     }
 
-    public CSharpCodeAnalyzer(ILogger<CSharpCodeAnalyzer> logger)
+    private CodeSymbolInfo? Find(Assembly asm, string fqName)
     {
-        _logger = logger;
-
-        var host = CreateIsolatedRoslynHost();
-        _ws = new AdhocWorkspace(host);
-    }
-
-    public async Task<CodeSymbolInfo?> AnalyzeAsync(
-        string filePath,
-        string symbolName,
-        CancellationToken ct = default)
-    {
-        _logger.LogInformation("Analyzing symbol '{SymbolName}' in file '{FilePath}'", symbolName, filePath);
-
-        var code = await File.ReadAllTextAsync(filePath, ct);
-
-        // Get all reference assemblies
-        var refDir = FindReferenceAssembliesDir();
-        var refs = Directory.GetFiles(refDir, "*.dll").Select(path => MetadataReference.CreateFromFile(path)).ToList();
-
-        // Get all user project DLLs
-        var userDlls = FindUserProjectDlls();
-        refs.AddRange(userDlls.Cast<PortableExecutableReference>());
-
-        // Set up parse and compilation options for latest C#
-        var parseOptions = new Microsoft.CodeAnalysis.CSharp.CSharpParseOptions(Microsoft.CodeAnalysis.CSharp.LanguageVersion.Preview);
-        var compilationOptions = new Microsoft.CodeAnalysis.CSharp.CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, metadataReferenceResolver: null, assemblyIdentityComparer: AssemblyIdentityComparer.Default);
-        var proj = _ws.AddProject("tmp", LanguageNames.CSharp)
-            .WithMetadataReferences(refs)
-            .WithParseOptions(parseOptions)
-            .WithCompilationOptions(compilationOptions);
-
-        var doc = _ws.AddDocument(proj.Id, Path.GetFileName(filePath), Microsoft.CodeAnalysis.Text.SourceText.From(code));
-        proj = doc.Project.WithMetadataReferences(refs);
-
-        var compilation = await proj.GetCompilationAsync(ct);
-        var globalNs   = compilation!.GlobalNamespace;
-
-        ISymbol? symbol = FindSymbol(globalNs, symbolName);
-        if (symbol == null)
+        foreach (var type in asm.GetTypes())
         {
-            foreach (var asm in compilation.References)
+            if (type.FullName == fqName) return ToInfo(type);
+
+            foreach (var m in type.GetMembers(BindingFlags.Public |
+                                              BindingFlags.NonPublic |
+                                              BindingFlags.Static |
+                                              BindingFlags.Instance))
             {
-                var asmSym = compilation.GetAssemblyOrModuleSymbol(asm) as IAssemblySymbol;
-                if (asmSym == null) continue;
-                var found = FindSymbol(asmSym.GlobalNamespace, symbolName);
-                if (found != null)
-                {
-                    symbol = found;
-                    break;
-                }
+                var full = $"{type.FullName}.{m.Name}";
+                if (full == fqName || m.Name == fqName || fqName.EndsWith($".{m.Name}"))
+                    return ToInfo(m);
             }
         }
 
-        if (symbol == null && symbolName.Contains("."))
-        {
-            var typeSym = compilation.GetTypeByMetadataName(symbolName);
-            if (typeSym != null)
-                symbol = typeSym;
-        }
-
-        return symbol is null
-            ? null 
-            : ToInfo(symbol);
-
-        ISymbol? FindSymbol(INamespaceOrTypeSymbol scope, string name)
-        {
-            foreach (var member in scope.GetMembers())
-            {
-                if (member.Name.Equals(name, StringComparison.Ordinal))
-                    return member;
-                if (member is INamespaceOrTypeSymbol nested)
-                {
-                    var found = FindSymbol(nested, name);
-                    if (found != null)
-                        return found;
-                }
-            }
-            return null;
-        }
-
-        CodeSymbolInfo ToInfo(ISymbol s) =>
-            new(
-                s.Name,
-                s.Kind.ToString(),
-                s.DeclaredAccessibility.ToString().ToLowerInvariant(),
-                (s as IMethodSymbol)?.ReturnType.ToDisplayString(),
-                (s as IMethodSymbol)?.Parameters
-                    .Select(p =>
-                        new CodeParameterInfo(p.Name,
-                            p.Type.ToDisplayString(),
-                            p.IsOptional,
-                            p.HasExplicitDefaultValue ? p.ExplicitDefaultValue?.ToString() : null))
-                    .ToList() ?? [],
-                (s as INamedTypeSymbol)?.TypeArguments.Select(a => a.Name).ToList() ?? [],
-                [.. s.GetAttributes().Select(a => a.AttributeClass?.Name ?? "")],
-                s.GetDocumentationCommentXml(),
-                (s as IMethodSymbol)?.ContainingType
-                    .GetMembers(s.Name)
-                    .OfType<IMethodSymbol>()
-                    .Where(o => !SymbolEqualityComparer.Default.Equals(o, s))
-                    .Select(ToInfo)
-                    .ToList()
-                    ?? new List<CodeSymbolInfo>()
-            );
+        return null;
     }
 
-    private static string FindReferenceAssembliesDir()
+    string? GetTargetFramework(string csprojPath)
     {
-        string? refDir = null;
-        var tfm = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription;
+        var xml = XDocument.Load(csprojPath);
 
-        var dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT");
-        if (string.IsNullOrEmpty(dotnetRoot)) throw new InvalidOperationException("DOTNET_ROOT environment variable is not set. Please set DOTNET_ROOT to your .NET SDK root directory.");
+        var tfm = xml.Descendants()
+            .Where(x => x.Name.LocalName == "TargetFramework" || x.Name.LocalName == "TargetFrameworks")
+            .Select(x => x.Value.Split(';').FirstOrDefault()?.Trim())
+            .FirstOrDefault();
 
-        if (tfm.Contains(".NET", StringComparison.OrdinalIgnoreCase))
-        {
-            var packsDir = Path.Combine(dotnetRoot, "packs", "Microsoft.NETCore.App.Ref");
-            if (Directory.Exists(packsDir))
-            {
-                var latest = Directory.GetDirectories(packsDir).OrderByDescending(x => x).FirstOrDefault();
-                if (latest != null)
-                {
-                    var refPath = Path.Combine(latest, "ref");
-                    if (Directory.Exists(refPath))
-                    {
-                        var tfmDir = Directory.GetDirectories(refPath)
-                            .OrderByDescending(x => x)
-                            .FirstOrDefault();
-                        if (tfmDir != null)
-                            refDir = tfmDir;
-                    }
-                }
-            }
-        }
-        if (refDir == null || !Directory.Exists(refDir)) throw new InvalidOperationException("Could not locate .NET reference assemblies on this system.");
+        return tfm;
+    }
+
+    string FindRefPackFolder(string tfm)
+    {
+        var dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT") ?? "/usr/share/dotnet";
+
+        var refPackRoot = Path.Combine(dotnetRoot, "packs", "Microsoft.NETCore.App.Ref");
+
+        var matching = Directory.GetDirectories(refPackRoot)
+            .OrderByDescending(x => x)
+            .FirstOrDefault();
+
+        if (matching == null)
+            throw new InvalidOperationException($"No versioned ref packs found in {refPackRoot}");
+
+        var refDir = Path.Combine(matching, "ref", tfm);
+        if (!Directory.Exists(refDir))
+            throw new DirectoryNotFoundException($"Expected ref dir: {refDir}");
+
         return refDir;
     }
 
-    private static IEnumerable<MetadataReference> FindUserProjectDlls()
+    static string? FindCsproj(string startPath)
     {
-        var dlls = new List<MetadataReference>();
-        var tfms = new[] { "net9.0", "net8.0", "net7.0", "net6.0", "net5.0", "netcoreapp3.1", "netstandard2.1", "netstandard2.0" };
-        var binNames = new[] { "bin", "obj" };
-        var configs = new[] { "Debug", "Release" };
-        var root = AppContext.BaseDirectory;
-
-        foreach (var bin in binNames)
+        var dir = new DirectoryInfo(startPath);
+        while (dir != null)
         {
-            foreach (var config in configs)
+            var proj = dir.GetFiles("*.csproj").FirstOrDefault();
+            if (proj != null) return proj.FullName;
+            dir = dir.Parent;
+        }
+        return null;
+    }
+
+    static string? FindBuildOutput(string csprojPath)
+    {
+        var projDir = Path.GetDirectoryName(csprojPath)!;
+
+        var tfms = new[] { "net9.0", "net8.0", "net7.0", "net6.0", "netstandard2.1", "netstandard2.0" };
+        var configs = new[] { "Release", "Debug" };
+
+        foreach (var config in configs)
+        {
+            foreach (var tfm in tfms)
             {
-                foreach (var tfm in tfms)
-                {
-                    var dir = Path.Combine(root, bin, config, tfm);
-                    if (Directory.Exists(dir))
-                    {
-                        foreach (var dll in Directory.GetFiles(dir, "*.dll"))
-                        {
-                            try { dlls.Add(MetadataReference.CreateFromFile(dll)); } catch { }
-                        }
-                    }
-                }
+                var binPath = Path.Combine(projDir, "bin", config, tfm);
+                if (Directory.Exists(binPath)) return binPath;
+            }
+        }
+        return null;
+    }
+
+    private static CodeSymbolInfo ToInfo(MemberInfo m)
+    {
+        return m switch
+        {
+            MethodInfo mi => new CodeSymbolInfo(
+                                mi.Name,
+                                "Method",
+                                mi.IsPublic ? "public" :
+                                mi.IsAssembly ? "internal" :
+                                mi.IsFamily ? "protected" : "private",
+                                mi.ReturnType.FullName,
+                                [.. mi.GetParameters()
+                                  .Where(p => !string.IsNullOrWhiteSpace(p.Name))
+                                  .Select(p => new CodeParameterInfo(
+                                      p.Name!, p.ParameterType.FullName!,
+                                      p.IsOptional,
+                                      p.HasDefaultValue ? p.RawDefaultValue?.ToString() : null))],
+                                [],
+                                [.. CustomAttributesFrom(mi)],
+                                GetXmlDoc(mi),
+                                GetOverloads(mi)),
+            Type t => new CodeSymbolInfo(
+                                t.Name,
+                                "Type",
+                                t.IsPublic ? "public" : t.IsNotPublic ? "internal" : "private",
+                                null,
+                                [],
+                                t.IsGenericType ? t.GetGenericArguments().Select(a => a.Name).ToList() : [],
+                                t.GetCustomAttributes().Select(a => a.GetType().Name).ToList(),
+                                GetXmlDoc(t),
+                                []),
+            _ => throw new NotSupportedException($"Unsupported member {m.MemberType}"),
+        };
+
+        static IEnumerable<string> CustomAttributesFrom(MemberInfo mi)
+        {
+            try
+            {
+                return mi.GetCustomAttributes().Select(a => a.GetType().Name);
+            }
+            catch
+            {
+                return Enumerable.Empty<string>();
             }
         }
 
-        return dlls;
+        static string? GetXmlDoc(MemberInfo mi)
+        {
+            var xmlPath = Path.ChangeExtension(mi.Module.FullyQualifiedName, ".xml");
+            if (!File.Exists(xmlPath)) return null;
+            var xdoc = XDocument.Load(xmlPath);
+            var id = $"M:{mi.DeclaringType!.FullName}.{mi.Name}";
+            return xdoc.Root?.Elements("member")
+                             .FirstOrDefault(e => e.Attribute("name")?.Value.StartsWith(id) == true)?
+                             .Value.Trim();
+        }
+
+        static List<CodeSymbolInfo> GetOverloads(MethodInfo mi) =>
+            mi.DeclaringType!
+              .GetMethods(BindingFlags.Public | BindingFlags.NonPublic |
+                          BindingFlags.Static | BindingFlags.Instance)
+              .Where(o => o.Name == mi.Name && o != mi)
+              .Select(o => ToInfo(o))
+              .ToList();
     }
 }
+

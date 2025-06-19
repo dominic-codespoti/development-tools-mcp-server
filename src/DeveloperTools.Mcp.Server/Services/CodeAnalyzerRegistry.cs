@@ -1,5 +1,7 @@
 using DeveloperTools.Mcp.Abstractions.Services;
 
+namespace DeveloperTools.Mcp.Server.Services;
+
 public sealed class CodeAnalyzerRegistry
 {
     private readonly Dictionary<string, ICodeAnalyzer> _byExt;
