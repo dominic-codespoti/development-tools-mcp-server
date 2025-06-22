@@ -20,21 +20,36 @@ This project provides an MCP server that exposes web search, content extraction,
 ### Prerequisites
 - [.NET 9.0 SDK](https://dotnet.microsoft.com/)
 
-### Build and Run
+### Install as a .NET Tool
+The MCP server is distributed as a .NET global tool via NuGet. To install it, run:
+
 ```sh
-dotnet build
-# Run the server (from the src/DeveloperTools.Mcp.Server directory):
-dotnet run
+dotnet tool install --global developer-tools-mcp-server
+```
+
+To update to the latest version:
+
+```sh
+dotnet tool update --global developer-tools-mcp-server
+```
+
+### Run the Server
+After installing, you can start the server with:
+
+```sh
+developer-tools-mcp-server
 ```
 
 The server will start and listen for MCP requests via stdio transport.
 
-### Prebuilt Binaries
-Self-contained, single-file executables for Linux, Windows, and macOS are built automatically for each release. You can download these from the GitHub Releases page or from workflow artifacts. These binaries include the .NET runtime and require no additional dependencies—just download and run on your platform:
+### Local Build (for development)
+If you want to build and run the server locally (for development or testing):
 
-- `mcp-linux-x64`
-- `mcp-win-x64.exe`
-- `mcp-osx-arm64`
+```sh
+dotnet build
+cd src/DeveloperTools.Mcp.Server
+dotnet run
+```
 
 ## Extending
 You can add new tools to the MCP server by creating static methods in any class and decorating them with the `[McpServerTool]` attribute. These methods will be exposed as tools to MCP clients. For example, you can add new capabilities for data access, computation, or integration with external services. See `Tools/WebSearcher.cs` for examples of tool definitions.

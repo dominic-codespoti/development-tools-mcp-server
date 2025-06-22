@@ -8,7 +8,7 @@ namespace DeveloperTools.Mcp.Server.Tools;
 public class CodeAnalysisTools
 {
     [McpServerTool(Name = "analyze-code-symbol")]
-    [Description("Return structural details (params, generics, overloads, docs) for a given class/function/etc.")]
+    [Description("Return structural details (params, generics, overloads, docs) for a given class/function/etc. Supports C#.")]
     public static async Task<CodeSymbolInfo?> AnalyzeCodeSymbolAsync(
         [Description("Absolute file path to the source file.")] string file_path,
         [Description("Fully qualified symbol name to analyse.")] string symbol_name,

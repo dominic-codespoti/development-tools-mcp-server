@@ -47,8 +47,10 @@ public sealed class CSharpCodeAnalyzer(ILogger<CSharpCodeAnalyzer> Logger) : ICo
                                               BindingFlags.Instance))
             {
                 var full = $"{type.FullName}.{m.Name}";
-                if (full == fqName || m.Name == fqName || fqName.EndsWith($".{m.Name}"))
+                if ((full == fqName || m.Name == fqName || fqName.EndsWith($".{m.Name}")) && (m is MethodInfo || m is Type))
+                {
                     return ToInfo(m);
+                }
             }
         }
 
@@ -122,7 +124,7 @@ public sealed class CSharpCodeAnalyzer(ILogger<CSharpCodeAnalyzer> Logger) : ICo
         return m switch
         {
             MethodInfo mi => new CodeSymbolInfo(
-                                mi.Name,
+                                $"{mi.DeclaringType?.FullName}.{mi.Name}",
                                 "Method",
                                 mi.IsPublic ? "public" :
                                 mi.IsAssembly ? "internal" :
@@ -139,13 +141,13 @@ public sealed class CSharpCodeAnalyzer(ILogger<CSharpCodeAnalyzer> Logger) : ICo
                                 GetXmlDoc(mi),
                                 GetOverloads(mi)),
             Type t => new CodeSymbolInfo(
-                                t.Name,
+                                t.FullName ?? t.Name,
                                 "Type",
                                 t.IsPublic ? "public" : t.IsNotPublic ? "internal" : "private",
                                 null,
                                 [],
                                 t.IsGenericType ? t.GetGenericArguments().Select(a => a.Name).ToList() : [],
-                                t.GetCustomAttributes().Select(a => a.GetType().Name).ToList(),
+                                CustomAttributesFrom(t).ToList(),
                                 GetXmlDoc(t),
                                 []),
             _ => throw new NotSupportedException($"Unsupported member {m.MemberType}"),
@@ -155,7 +157,7 @@ public sealed class CSharpCodeAnalyzer(ILogger<CSharpCodeAnalyzer> Logger) : ICo
         {
             try
             {
-                return mi.GetCustomAttributes().Select(a => a.GetType().Name);
+                return CustomAttributeData.GetCustomAttributes(mi).Select(a => a.AttributeType.Name);
             }
             catch
             {
