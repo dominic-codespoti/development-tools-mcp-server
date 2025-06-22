@@ -76,3 +76,4 @@ jobs:
           dotnet tool update --global developer-tools-mcp-server --version $VERSION || true
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          VERSION: ${{ env.VERSION }}
