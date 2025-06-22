@@ -9,7 +9,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>developer-tools-mcp-server</ToolCommandName>
     <PackageId>developer-tools-mcp-server</PackageId>
-    <Version>0.1.0</Version>
+    <Version>1.0.1</Version>
   </PropertyGroup>
 
   <ItemGroup>
