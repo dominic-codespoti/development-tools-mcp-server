@@ -1,3 +1,5 @@
+namespace DeveloperTools.Mcp.Abstractions.Models;
+
 public record CodeSymbolInfo(
     string SymbolName,
     string Kind,          // "class", "method", "property", …

@@ -12,8 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference
-      Include="..\DeveloperTools.Mcp.Abstractions\DeveloperTools.Mcp.Abstractions.csproj" />
+    <ProjectReference Include="..\DeveloperTools.Mcp.Abstractions\DeveloperTools.Mcp.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -22,6 +21,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.5" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.5" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.5" />
+    <PackageReference Include="ReverseMarkdown" Version="4.7.0" />
     <PackageReference Include="System.Reflection.MetadataLoadContext" Version="8.0.0" />
     <PackageReference Include="ModelContextProtocol" Version="0.2.0-preview.3" />
   </ItemGroup>

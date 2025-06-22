@@ -11,7 +11,6 @@ public sealed class CodeAnalyzerRegistry
                a => a switch
                {
                    CSharpCodeAnalyzer => ".cs",
-                   // future: new TypeScriptAnalyzer() => ".ts",
                    _ => throw new NotSupportedException()
                }, a => a);
 
@@ -26,7 +25,6 @@ public sealed class CodeAnalyzerRegistry
     private static string GuessExt(string lang) => lang.ToLowerInvariant() switch
     {
         "csharp" or "cs" => ".cs",
-        "typescript" or "ts" => ".ts",
         _ => throw new NotSupportedException(lang)
     };
 }

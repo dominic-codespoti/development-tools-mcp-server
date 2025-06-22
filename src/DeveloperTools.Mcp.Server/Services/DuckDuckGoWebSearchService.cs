@@ -4,6 +4,7 @@ using AngleSharp.Html.Parser;
 using DeveloperTools.Mcp.Abstractions.Services;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using ReverseMarkdown;
 
 namespace DeveloperTools.Mcp.Server.Services;
 
@@ -13,7 +14,6 @@ public sealed partial class DuckDuckGoWebSearchService(
     ILogger<DuckDuckGoWebSearchService> logger) : IWebSearchService
 {
     private const int MaxChars = 3_000;
-    private const int MaxParagraphs = 6;
     private static readonly HtmlParser _parser = new();
     private static readonly Regex _ws = WhitespaceRegex();
 
@@ -57,17 +57,18 @@ public sealed partial class DuckDuckGoWebSearchService(
         var doc = await _parser.ParseDocumentAsync(body, ct);
         var main = doc.QuerySelector("article") ?? doc.Body ?? doc.DocumentElement;
 
-        var text = string.Join(" ",
-                    main.QuerySelectorAll("p,h1,h2,h3,li")
-                        .Select(n => _ws.Replace(n.TextContent, " ").Trim())
-                        .Where(t => t.Length > 40)
-                        .Take(MaxParagraphs));
+        foreach (var node in main.QuerySelectorAll("script,style,meta,link,noscript"))
+            node.Remove();
 
-        text = _ws.Replace(text, " ");
-        text = text.Length > MaxChars ? text[..MaxChars] : text;
+        var html = main.InnerHtml;
+        var converter = new Converter();
+        var markdown = converter.Convert(html);
 
-        cache.Set(uri, text, TimeSpan.FromMinutes(30));
-        return text;
+        markdown = _ws.Replace(markdown, " ");
+        markdown = markdown.Length > MaxChars ? markdown[..MaxChars] : markdown;
+
+        cache.Set(uri, markdown, TimeSpan.FromMinutes(30));
+        return markdown;
     }
 
     [GeneratedRegex(@"\s+", RegexOptions.Compiled)]

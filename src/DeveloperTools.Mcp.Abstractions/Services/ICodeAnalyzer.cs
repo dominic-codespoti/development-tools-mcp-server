@@ -1,3 +1,5 @@
+using DeveloperTools.Mcp.Abstractions.Models;
+
 namespace DeveloperTools.Mcp.Abstractions.Services;
 
 public interface ICodeAnalyzer
