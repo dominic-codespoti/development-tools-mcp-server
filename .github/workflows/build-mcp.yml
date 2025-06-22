@@ -13,9 +13,15 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
-      - name: Pack as .NET tool
+      - name: Read version from csproj
+        id: csproj_version
         run: |
-          dotnet pack src/DeveloperTools.Mcp.Server -c Release --output ./nupkg
+          VERSION=$(grep '<Version>' src/DeveloperTools.Mcp.Server/DeveloperTools.Mcp.Server.csproj | sed -E 's/.*<Version>(.+)<\/Version>.*/\1/')
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "::set-output name=version::$VERSION"
+      - name: Pack as .NET tool (with csproj version)
+        run: |
+          dotnet pack src/DeveloperTools.Mcp.Server -c Release --output ./nupkg /p:Version=$VERSION
         shell: bash
       - uses: actions/upload-artifact@v4
         with:
@@ -64,7 +70,9 @@ jobs:
         with:
           name: developer-tools-mcp-server-nuget
           path: ./nupkg
-      - name: Push .NET tool package to NuGet.org
-        run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+      - name: Push .NET tool package to NuGet.org (latest)
+        run: |
+          dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+          dotnet tool update --global developer-tools-mcp-server --version $VERSION
         env:
           NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
