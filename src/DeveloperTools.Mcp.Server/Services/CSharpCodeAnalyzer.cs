@@ -43,9 +43,9 @@ public sealed class CSharpCodeAnalyzer(ILogger<CSharpCodeAnalyzer> Logger) : ICo
             if (type.FullName == fqName) return ToInfo(type);
 
             foreach (var m in type.GetMembers(BindingFlags.Public |
-                                              BindingFlags.NonPublic |
-                                              BindingFlags.Static |
-                                              BindingFlags.Instance))
+                        BindingFlags.NonPublic |
+                        BindingFlags.Static |
+                        BindingFlags.Instance))
             {
                 var full = $"{type.FullName}.{m.Name}";
                 if ((full == fqName || m.Name == fqName || fqName.EndsWith($".{m.Name}")) && (m is MethodInfo || m is Type))
@@ -76,18 +76,30 @@ public sealed class CSharpCodeAnalyzer(ILogger<CSharpCodeAnalyzer> Logger) : ICo
 
         var refPackRoot = Path.Combine(dotnetRoot, "packs", "Microsoft.NETCore.App.Ref");
 
-        var matching = Directory.GetDirectories(refPackRoot)
+        var versions = Directory.GetDirectories(refPackRoot)
             .OrderByDescending(x => x)
-            .FirstOrDefault();
+            .ToList();
 
-        if (matching == null)
+        if (!versions.Any())
             throw new InvalidOperationException($"No versioned ref packs found in {refPackRoot}");
 
-        var refDir = Path.Combine(matching, "ref", tfm);
-        if (!Directory.Exists(refDir))
-            throw new DirectoryNotFoundException($"Expected ref dir: {refDir}");
+        // Try to find the exact TFM in available versions
+        foreach (var versionPath in versions)
+        {
+            var refDir = Path.Combine(versionPath, "ref", tfm);
+            if (Directory.Exists(refDir))
+                return refDir;
+        }
 
-        return refDir;
+        // If exact TFM not found, use the highest version's first available TFM as fallback
+        var highestVersion = versions.First();
+        var refPath = Path.Combine(highestVersion, "ref");
+        var fallbackDir = Directory.GetDirectories(refPath).FirstOrDefault();
+        
+        if (fallbackDir != null)
+            return fallbackDir;
+
+        throw new DirectoryNotFoundException($"Expected ref dir: {Path.Combine(refPackRoot, "*", "ref", tfm)}");
     }
 
     static string? FindCsproj(string startPath)
@@ -125,32 +137,32 @@ public sealed class CSharpCodeAnalyzer(ILogger<CSharpCodeAnalyzer> Logger) : ICo
         return m switch
         {
             MethodInfo mi => new CodeSymbolInfo(
-                                $"{mi.DeclaringType?.FullName}.{mi.Name}",
-                                "Method",
-                                mi.IsPublic ? "public" :
-                                mi.IsAssembly ? "internal" :
-                                mi.IsFamily ? "protected" : "private",
-                                mi.ReturnType.FullName,
-                                [.. mi.GetParameters()
-                                  .Where(p => !string.IsNullOrWhiteSpace(p.Name))
-                                  .Select(p => new CodeParameterInfo(
-                                      p.Name!, p.ParameterType.FullName!,
-                                      p.IsOptional,
-                                      p.HasDefaultValue ? p.RawDefaultValue?.ToString() : null))],
-                                [],
-                                [.. CustomAttributesFrom(mi)],
-                                GetXmlDoc(mi),
-                                GetOverloads(mi)),
+                    $"{mi.DeclaringType?.FullName}.{mi.Name}",
+                    "Method",
+                    mi.IsPublic ? "public" :
+                    mi.IsAssembly ? "internal" :
+                    mi.IsFamily ? "protected" : "private",
+                    mi.ReturnType.FullName,
+                    [.. mi.GetParameters()
+                    .Where(p => !string.IsNullOrWhiteSpace(p.Name))
+                    .Select(p => new CodeParameterInfo(
+                            p.Name!, p.ParameterType.FullName!,
+                            p.IsOptional,
+                            p.HasDefaultValue ? p.RawDefaultValue?.ToString() : null))],
+                    [],
+                    [.. CustomAttributesFrom(mi)],
+                    GetXmlDoc(mi),
+                    GetOverloads(mi)),
             Type t => new CodeSymbolInfo(
-                                t.FullName ?? t.Name,
-                                "Type",
-                                t.IsPublic ? "public" : t.IsNotPublic ? "internal" : "private",
-                                null,
-                                [],
-                                t.IsGenericType ? t.GetGenericArguments().Select(a => a.Name).ToList() : [],
-                                CustomAttributesFrom(t).ToList(),
-                                GetXmlDoc(t),
-                                []),
+                    t.FullName ?? t.Name,
+                    "Type",
+                    t.IsPublic ? "public" : t.IsNotPublic ? "internal" : "private",
+                    null,
+                    [],
+                    t.IsGenericType ? t.GetGenericArguments().Select(a => a.Name).ToList() : [],
+                    CustomAttributesFrom(t).ToList(),
+                    GetXmlDoc(t),
+                    []),
             _ => throw new NotSupportedException($"Unsupported member {m.MemberType}"),
         };
 
@@ -173,17 +185,17 @@ public sealed class CSharpCodeAnalyzer(ILogger<CSharpCodeAnalyzer> Logger) : ICo
             var xdoc = XDocument.Load(xmlPath);
             var id = $"M:{mi.DeclaringType!.FullName}.{mi.Name}";
             return xdoc.Root?.Elements("member")
-                             .FirstOrDefault(e => e.Attribute("name")?.Value.StartsWith(id) == true)?
-                             .Value.Trim();
+                .FirstOrDefault(e => e.Attribute("name")?.Value.StartsWith(id) == true)?
+                .Value.Trim();
         }
 
         static List<CodeSymbolInfo> GetOverloads(MethodInfo mi) =>
             mi.DeclaringType!
-              .GetMethods(BindingFlags.Public | BindingFlags.NonPublic |
-                          BindingFlags.Static | BindingFlags.Instance)
-              .Where(o => o.Name == mi.Name && o != mi)
-              .Select(o => ToInfo(o))
-              .ToList();
+            .GetMethods(BindingFlags.Public | BindingFlags.NonPublic |
+                    BindingFlags.Static | BindingFlags.Instance)
+            .Where(o => o.Name == mi.Name && o != mi)
+            .Select(o => ToInfo(o))
+            .ToList();
     }
 }
 

@@ -6,15 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 var builder = Host.CreateApplicationBuilder(args);
-builder.Logging.AddConsole(consoleLogOptions =>
-{
-    consoleLogOptions.LogToStandardErrorThreshold = LogLevel.Error;
-});
-
-var informationalVersion = typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown";
-var loggerFactory = LoggerFactory.Create(cfg => cfg.AddConsole());
-var logger = loggerFactory.CreateLogger("Startup");
-logger.LogInformation($"Running version {informationalVersion}");
+builder.Logging.AddConsole(consoleLogOptions => consoleLogOptions.LogToStandardErrorThreshold = LogLevel.Error);
 
 builder.Services.AddMemoryCache();
 builder.Services.AddHttpClient<DuckDuckGoWebSearchService>();
